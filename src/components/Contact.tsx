@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { MapPin, Phone, Mail, Clock, CheckCircle, AlertCircle } from 'lucide-react';
 import { useScrollAnimation } from '../hooks/useScrollAnimation';
-import { submitCita, type CitaFormData } from '../lib/supabase';
+
+const MAKE_WEBHOOK_URL = 'https://hook.eu1.make.com/bergzwtvwblomlktvbd50rcnykuvf92t';
 
 const servicios = [
   'Ortodoncia',
@@ -41,7 +42,7 @@ export default function Contact() {
   const { ref: leftRef, isVisible: leftVisible } = useScrollAnimation();
   const { ref: rightRef, isVisible: rightVisible } = useScrollAnimation();
 
-  const [form, setForm] = useState<CitaFormData>({
+  const [form, setForm] = useState({
     nombre: '',
     email: '',
     telefono: '',
@@ -61,15 +62,32 @@ export default function Contact() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.nombre || !form.email || !form.telefono || !form.servicio) {
+    if (!form.nombre || !form.email || !form.servicio) {
       setError('Por favor, completa todos los campos obligatorios.');
       return;
     }
     setLoading(true);
     try {
-      await submitCita(form);
-      setSuccess(true);
-      setForm({ nombre: '', email: '', telefono: '', servicio: '', mensaje: '' });
+      const res = await fetch(MAKE_WEBHOOK_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          nombre: form.nombre,
+          apellido: '',
+          email: form.email,
+          telefono: form.telefono,
+          asunto: form.servicio,
+          mensaje: form.mensaje,
+          fecha: new Date().toLocaleString('es-ES'),
+          origen: 'Clínica Dental Sonrisa'
+        })
+      });
+      if (res.ok) {
+        setSuccess(true);
+        setForm({ nombre: '', email: '', telefono: '', servicio: '', mensaje: '' });
+      } else {
+        throw new Error('Error en webhook');
+      }
     } catch {
       setError('Hubo un error al enviar tu solicitud. Por favor, inténtalo de nuevo.');
     } finally {
@@ -150,7 +168,7 @@ export default function Contact() {
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                     <div>
-                      <label className="form-label">Teléfono *</label>
+                      <label className="form-label">Teléfono (opcional)</label>
                       <input
                         type="tel"
                         name="telefono"
@@ -158,7 +176,6 @@ export default function Contact() {
                         onChange={handleChange}
                         placeholder="+34 600 000 000"
                         className="form-input"
-                        required
                       />
                     </div>
                     <div>
